@@ -1,0 +1,5 @@
+#include "src/cutils.c"
+#include "src/libregexp.c"
+#include "src/libunicode.c"
+#include "src/quickjs.c"
+#include "src/quickjs-libc.c"
