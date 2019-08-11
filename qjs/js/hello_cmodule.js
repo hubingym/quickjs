@@ -1,6 +1,8 @@
 /* example of JS module importing a C module */
 
-import { fib } from "fib";
+import * as demo from "demo";
 
 console.log("Hello World");
-console.log("fib(10)=", fib(10));
+console.log(JSON.stringify(demo));
+console.log("demo.fib(10)=", demo.fib(10));
+console.log("demo.obj1.fib(5)=", demo.obj1.fib(5));

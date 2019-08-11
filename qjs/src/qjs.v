@@ -41,7 +41,7 @@ fn main() {
     // initial std library
     ctx.init_std()
     // custom modules
-    init_module_fib(ctx)
+    init_module_demo(ctx)
     // execute file
     ctx.eval_file(files[0])
     // loop

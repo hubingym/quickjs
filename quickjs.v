@@ -4,6 +4,13 @@ module quickjs
 #include "quickjs-libc.h"
 #flag @VMOD/quickjs/quickjs.o
 
+import const (
+    JS_PROP_CONFIGURABLE
+    JS_PROP_WRITABLE
+    JS_PROP_ENUMERABLE
+    JS_PROP_C_W_E
+)
+
 struct C.JSRuntime {
 }
 
@@ -13,13 +20,28 @@ struct C.JSContext {
 struct C.JSModuleDef {
 }
 
+struct C.JSClassDef {
+}
+
 struct C.JSValue {
 }
 
 struct C.JSValueConst {
 }
 
+fn C.JS_GetRuntime(*C.JSContext) *C.JSRuntime
+fn C.JS_NewClassID(*u32) u32
+fn C.JS_NewClass(*C.JSRuntime, u32, *C.JSClassDef) int
+fn C.JS_SetClassProto(*C.JSContext, u32, C.JSValue)
+fn C.JS_DefinePropertyValueStr(*C.JSContext, C.JSValueConst, byteptr, C.JSValue, int) int
+fn C.JS_NewObject(*C.JSContext) C.JSValue
+fn C.JS_GetGlobalObject(*C.JSContext) C.JSValue
 fn C.JS_NewCFunction(*C.JSContext, voidptr, byteptr, int) C.JSValue
+fn C.JS_NewBool(*C.JSContext, int) C.JSValue
+fn C.JS_NewInt32(*C.JSContext, i32) C.JSValue
+fn C.JS_NewFloat64(*C.JSContext, f64) C.JSValue
+fn C.__JS_NewFloat64(*C.JSContext, f64) C.JSValue
+fn C.JS_NewString(*C.JSContext, byteptr) C.JSValue
 fn C.JS_AddModuleExport(*C.JSContext, *C.JSModuleDef, byteptr) int
 fn C.JS_SetModuleExport(*C.JSContext, *C.JSModuleDef, byteptr, C.JSValue) int
 
@@ -76,7 +98,7 @@ pub fn (ctx mut Context) free() {
     ctx.p_ctx = 0
 }
 
-pub fn (ctx mut Context) init_std() {
+pub fn (ctx Context) init_std() {
     p_ctx := ctx.p_ctx
     // TODO: int argc, char **argv
      C.js_std_add_helpers(p_ctx, 0, 0)
@@ -85,12 +107,49 @@ pub fn (ctx mut Context) init_std() {
     C.js_init_module_os(p_ctx, 'os')
 }
 
-pub fn (ctx mut Context) eval_file(filename string) {
+pub fn (ctx Context) eval_file(filename string) {
     C.eval_file(ctx.p_ctx, filename.str, 0)
 }
 
-pub fn (ctx mut Context) loop() {
+pub fn (ctx Context) loop() {
     C.js_std_loop(ctx.p_ctx)
+}
+
+pub fn (ctx Context) define_property_value_str(this_obj C.JSValue, prop string, val C.JSValue) int {
+    return C.JS_DefinePropertyValueStr(ctx.p_ctx, this_obj, prop.str, val, JS_PROP_C_W_E)
+}
+
+pub fn (ctx Context) define_property_cfunc(this_obj C.JSValue, prop string, length int, func voidptr) int {
+    val := C.JS_NewCFunction(ctx.p_ctx, func, prop.str, length)
+    return ctx.define_property_value_str(this_obj, prop, val)
+}
+
+pub fn (ctx Context) define_property_bool(this_obj C.JSValue, prop string, value bool) int {
+    val := C.JS_NewBool(ctx.p_ctx, value)
+    return ctx.define_property_value_str(this_obj, prop, val)
+}
+
+pub fn (ctx Context) define_property_int32(this_obj C.JSValue, prop string, value int) int {
+    val := C.JS_NewInt32(ctx.p_ctx, value)
+    return ctx.define_property_value_str(this_obj, prop, val)
+}
+
+pub fn (ctx Context) define_property_double(this_obj C.JSValue, prop string, value f64) int {
+    val := C.JS_NewFloat64(ctx.p_ctx, value)
+    return ctx.define_property_value_str(this_obj, prop, val)
+}
+
+pub fn (ctx Context) define_property_string(this_obj C.JSValue, prop string, value string) int {
+    val := C.JS_NewString(ctx.p_ctx, value.str)
+    return ctx.define_property_value_str(this_obj, prop, val)
+}
+
+pub fn (ctx Context) get_global_bject() C.JSValue {
+    return C.JS_GetGlobalObject(ctx.p_ctx)
+}
+
+pub fn (ctx Context) new_object() C.JSValue {
+    return C.JS_NewObject(ctx.p_ctx)
 }
 
 pub fn (ctx Context) add_module(name string) *Module {
@@ -132,10 +191,27 @@ pub fn new_cfunc_def(name string, length int, func voidptr) CFuncDef {
     }
 }
 
+struct JsValueDef {
+    name string
+    val C.JSValue
+}
+
+pub fn new_jsvalue_def(name string, val C.JSValue) JsValueDef {
+    return JsValueDef {
+        name: name
+        val: val
+    }
+}
+
 struct Module {
     p_ctx *C.JSContext
     p_m *C.JSModuleDef
     funcs []CFuncDef
+    vals []JsValueDef
+    bool_map map[string]bool
+    i32_map map[string]int
+    f64_map map[string]f64
+    str_map map[string]string
 }
 
 fn new_module(p_ctx *C.JSContext, name string, init_func voidptr) *Module {
@@ -146,6 +222,10 @@ fn new_module(p_ctx *C.JSContext, name string, init_func voidptr) *Module {
     m := &Module {
         p_ctx: p_ctx
         p_m: p_m
+        bool_map: map[string]bool{}
+        i32_map: map[string]int{}
+        f64_map: map[string]f64{}
+        str_map: map[string]string{}
     }
     return m
 }
@@ -174,19 +254,65 @@ fn (m mut Module) set_export_item(name string, val C.JSValue) {
     }
 }
 
-fn (m mut Module) new_cfunction(def CFuncDef) {
-    val := C.JS_NewCFunction(m.p_ctx, def.func, def.name.str, def.length)
-    m.set_export_item(def.name, val)
-}
-
 fn (m mut Module) inner_init() {
-    for func in m.funcs {
-        m.new_cfunction(func)
+    for def in m.funcs {
+        val := C.JS_NewCFunction(m.p_ctx, def.func, def.name.str, def.length)
+        m.set_export_item(def.name, val)
+    }
+
+    for def in m.vals {
+        m.set_export_item(def.name, def.val)
+    }
+
+    for name, value in m.bool_map {
+        val := C.JS_NewBool(m.p_ctx, value)
+        m.set_export_item(name, val)
+    }
+
+    for name, value in m.i32_map {
+        val := C.JS_NewInt32(m.p_ctx, value)
+        m.set_export_item(name, val)
+    }
+
+    for name, value in m.f64_map {
+        val := C.__JS_NewFloat64(m.p_ctx, value)
+        m.set_export_item(name, val)
+    }
+
+    for name, value in m.str_map {
+        val := C.JS_NewString(m.p_ctx, value.str)
+        m.set_export_item(name, val)
     }
 }
 
-pub fn (m mut Module) add_cfunction(name string, length int, func voidptr) {
+pub fn (m mut Module) new_cfunction(name string, length int, func voidptr) {
     m.add_export_item(name)
     def := new_cfunc_def(name, length, func)
     m.funcs << def
+}
+
+pub fn (m mut Module) new_jsval(name string, val C.JSValue) {
+    m.add_export_item(name)
+    def := new_jsvalue_def(name, val)
+    m.vals << def
+}
+
+pub fn (m mut Module) new_bool(name string, value bool) {
+    m.add_export_item(name)
+    m.bool_map[name] = value
+}
+
+pub fn (m mut Module) new_int32(name string, value int) {
+    m.add_export_item(name)
+    m.i32_map[name] = value
+}
+
+pub fn (m mut Module) new_double(name string, value f64) {
+    m.add_export_item(name)
+    m.f64_map[name] = value
+}
+
+pub fn (m2 mut Module) new_string(name string, value string) {
+    m2.add_export_item(name)
+    m2.str_map[name] = value
 }
