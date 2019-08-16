@@ -5,10 +5,26 @@ module quickjs
 #flag @VMOD/quickjs/quickjs.o
 
 import const (
+    JS_TAG_BOOL
+    JS_TAG_NULL
+    JS_TAG_UNDEFINED
+    JS_TAG_EXCEPTION
+
     JS_PROP_CONFIGURABLE
     JS_PROP_WRITABLE
     JS_PROP_ENUMERABLE
     JS_PROP_C_W_E
+
+    JS_CFUNC_generic
+    JS_CFUNC_generic_magic
+    JS_CFUNC_constructor
+    JS_CFUNC_constructor_magic
+    JS_CFUNC_constructor_or_func
+    JS_CFUNC_constructor_or_func_magic
+    JS_CFUNC_getter
+    JS_CFUNC_setter
+    JS_CFUNC_getter_magic
+    JS_CFUNC_setter_magic
 )
 
 struct C.JSRuntime {
@@ -20,43 +36,63 @@ struct C.JSContext {
 struct C.JSModuleDef {
 }
 
-// struct C.JSClassDef {
-//     class_name byteptr
-//     finalizer voidptr
-// }
-
 struct C.JSClassDef {
+    class_name byteptr
+    finalizer voidptr
+    gc_mark voidptr
+    call voidptr
+    exotic voidptr
 }
 
 struct C.JSValue {
 }
 
-struct C.JSValueConst {
-}
-
-fn C.JS_ToInt32(*C.JSContext, *u32, C.JSValueConst) int
+fn C.js_malloc(*C.JSContext, u32) voidptr
+fn C.js_free(*C.JSContext, voidptr)
 fn C.JS_GetRuntime(*C.JSContext) *C.JSRuntime
+fn C.JS_AddModuleExport(*C.JSContext, *C.JSModuleDef, byteptr) int
+fn C.JS_SetModuleExport(*C.JSContext, *C.JSModuleDef, byteptr, C.JSValue) int
+
 fn C.JS_NewClassID(*u32) u32
 fn C.JS_NewClass(*C.JSRuntime, u32, *C.JSClassDef) int
 fn C.JS_SetClassProto(*C.JSContext, u32, C.JSValue)
-fn C.JS_SetPropertyStr(*C.JSContext, C.JSValueConst, byteptr, C.JSValue) int
+fn C.JS_GetClassProto(*C.JSContext, u32) C.JSValue
+
+fn C.JS_SetPropertyStr(*C.JSContext, C.JSValue, byteptr, C.JSValue) int
+fn C.JS_GetPropertyStr(*C.JSContext, C.JSValue, byteptr) C.JSValue
+
+// fn C.JS_SetOpaque(C.JSValue, voidptr)
+// fn C.JS_GetOpaque(C.JSValue, u32) voidptr
+
+fn C.JS_GetGlobalObject(*C.JSContext) C.JSValue
+fn C.JS_DupValue(*C.JSContext, C.JSValue) C.JSValue
+fn C.JS_FreeValue(*C.JSContext, C.JSValue)
 fn C.JS_NewObjectClass(*C.JSContext, u32) C.JSValue
 fn C.JS_NewObject(*C.JSContext) C.JSValue
 fn C.JS_NewArray(*C.JSContext) C.JSValue
-fn C.JS_GetGlobalObject(*C.JSContext) C.JSValue
-fn C.JS_DupValue(*C.JSContext, C.JSValueConst) C.JSValue
 fn C.JS_NewCFunction(*C.JSContext, voidptr, byteptr, int) C.JSValue
+fn C.JS_NewCFunction2(*C.JSContext, voidptr, byteptr, int, int, int) C.JSValue
 fn C.JS_NewBool(*C.JSContext, int) C.JSValue
 fn C.JS_NewInt32(*C.JSContext, i32) C.JSValue
 fn C.JS_NewFloat64(*C.JSContext, f64) C.JSValue
 fn C.JS_NewString(*C.JSContext, byteptr) C.JSValue
-fn C.JS_AddModuleExport(*C.JSContext, *C.JSModuleDef, byteptr) int
-fn C.JS_SetModuleExport(*C.JSContext, *C.JSModuleDef, byteptr, C.JSValue) int
+
+fn C.JS_ToBool(*C.JSContext, *u32, C.JSValue) int /* return -1 for JS_EXCEPTION */
+fn C.JS_ToInt32(*C.JSContext, *u32, C.JSValue) int
+fn C.JS_ToFloat64(*C.JSContext, *f64, C.JSValue) int
+fn C.JS_ToCString(*C.JSContext, C.JSValue) byteptr
+fn C.JS_FreeCString(*C.JSContext, byteptr)
 
 fn todo_remove(){}
 
+
+pub fn new_class_id() u32 {
+    class_id := u32(0)
+    return C.JS_NewClassID(&class_id)
+}
+
 struct Runtime {
-pub: mut:
+mut:
     p_rt *C.JSRuntime
 }
 
@@ -72,10 +108,20 @@ pub fn new_runtime() Runtime {
     }
 }
 
-pub fn (rt mut Runtime) free() {
+pub fn make_runtime(p_rt *C.JSRuntime) Runtime {
+    rt := Runtime {
+        p_rt: p_rt
+    }
+    return rt
+}
+
+pub fn (rt Runtime) free() {
     C.js_std_free_handlers(rt.p_rt)
     C.JS_FreeRuntime(rt.p_rt)
-    rt.p_rt = 0
+}
+
+pub fn (rt Runtime) run_gc() {
+    C.JS_RunGC(rt.p_rt)
 }
 
 struct Context {
@@ -133,9 +179,22 @@ pub fn (ctx Context) set_property_bool(this_obj C.JSValue, prop string, value bo
     return C.JS_SetPropertyStr(ctx.p_ctx, this_obj, prop.str, val)
 }
 
+pub fn (ctx Context) get_property_bool(this_obj C.JSValue, prop string) bool {
+    val := C.JS_GetPropertyStr(ctx.p_ctx, this_obj, prop.str)
+    n := C.JS_ToBool(ctx.p_ctx, val)
+    return n == 1
+}
+
 pub fn (ctx Context) set_property_int32(this_obj C.JSValue, prop string, value int) int {
     val := C.JS_NewInt32(ctx.p_ctx, value)
     return C.JS_SetPropertyStr(ctx.p_ctx, this_obj, prop.str, val)
+}
+
+pub fn (ctx Context) get_property_int32(this_obj C.JSValue, prop string) int {
+    val := C.JS_GetPropertyStr(ctx.p_ctx, this_obj, prop.str)
+    n := 0
+    C.JS_ToInt32(ctx.p_ctx, &n, val)
+    return n
 }
 
 pub fn (ctx Context) set_property_double(this_obj C.JSValue, prop string, value f64) int {
@@ -143,9 +202,24 @@ pub fn (ctx Context) set_property_double(this_obj C.JSValue, prop string, value 
     return C.JS_SetPropertyStr(ctx.p_ctx, this_obj, prop.str, val)
 }
 
+pub fn (ctx Context) get_property_double(this_obj C.JSValue, prop string) f64 {
+    val := C.JS_GetPropertyStr(ctx.p_ctx, this_obj, prop.str)
+    d := f64(0)
+    C.JS_ToFloat64(ctx.p_ctx, &d, val)
+    return d
+}
+
 pub fn (ctx Context) set_property_string(this_obj C.JSValue, prop string, value string) int {
     val := C.JS_NewString(ctx.p_ctx, value.str)
     return C.JS_SetPropertyStr(ctx.p_ctx, this_obj, prop.str, val)
+}
+
+pub fn (ctx Context) get_property_string(this_obj C.JSValue, prop string) string {
+    val := C.JS_GetPropertyStr(ctx.p_ctx, this_obj, prop.str)
+    pstr := C.JS_ToCString(ctx.p_ctx, val)
+    res := tos_clone(pstr)
+    C.JS_FreeCString(ctx.p_ctx, pstr)
+    return res
 }
 
 pub fn (ctx Context) dup_value(val C.JSValue) C.JSValue {
@@ -156,12 +230,25 @@ pub fn (ctx Context) free_value(val C.JSValue) {
     C.JS_FreeValue(ctx.p_ctx, val)
 }
 
+pub fn (ctx Context) set_opaque(obj C.JSValue, opaque voidptr) {
+    C.JS_SetOpaque(obj, opaque)
+}
+
+pub fn (ctx Context) get_opaque(obj C.JSValue, class_id u32) voidptr {
+    return C.JS_GetOpaque(obj, class_id)
+}
+
 pub fn (ctx Context) get_global_object() C.JSValue {
     return C.JS_GetGlobalObject(ctx.p_ctx)
 }
 
 pub fn (ctx Context) new_object() C.JSValue {
     return C.JS_NewObject(ctx.p_ctx)
+}
+
+pub fn (ctx Context) new_object_class(class_id u32) C.JSValue {
+    obj := C.JS_NewObjectClass(ctx.p_ctx, class_id)
+    return obj
 }
 
 pub fn (ctx Context) new_array() C.JSValue {
@@ -219,12 +306,17 @@ pub fn (m Module) add_export_list(names []string) int {
 pub fn (m Module) set_export_item(name string, val C.JSValue) {
     res := C.JS_SetModuleExport(m.p_ctx, m.p_m, name.str, val)
     if res != 0 {
-        panic('quickjs: set_export_item failed')
+        panic('quickjs: set_export_item failed, please make sure that \'$name\' is added to export list')
     }
 }
 
 pub fn (m Module) new_cfunction(name string, length int, func voidptr) {
     val := C.JS_NewCFunction(m.p_ctx, func, name.str, length)
+    m.set_export_item(name, val)
+}
+
+pub fn (m Module) new_constructor(name string, length int, func voidptr) {
+    val := C.JS_NewCFunction2(m.p_ctx, func, name.str, length, JS_CFUNC_constructor, 0)
     m.set_export_item(name, val)
 }
 
@@ -252,11 +344,9 @@ pub fn (m Module) new_string(name string, value string) {
     m.set_export_item(name, val)
 }
 
-// pub fn (m Module) new_class(class_def *C.JSClassDef, proto C.JSValue) {
-//     class_id := u32(0)
-//     p_ctx := m.p_ctx
-//     p_rt := C.JS_GetRuntime(p_ctx)
-//     C.JS_NewClassID(&class_id)
-//     C.JS_NewClass(p_rt, class_def, class_def)
-//     C.JS_SetClassProto(p_ctx, class_id, proto)
-// }
+pub fn (m Module) new_class(class_id u32, class_def *C.JSClassDef, proto C.JSValue) {
+    p_ctx := m.p_ctx
+    p_rt := C.JS_GetRuntime(p_ctx)
+    C.JS_NewClass(p_rt, class_id, class_def)
+    C.JS_SetClassProto(p_ctx, class_id, proto)
+}
