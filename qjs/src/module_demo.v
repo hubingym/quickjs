@@ -54,7 +54,7 @@ fn counter_update(p_ctx *C.JSContext, this_val C.JSValue, argc int, argv *C.JSVa
     return C.JS_MKVAL(JS_TAG_UNDEFINED, 0)
 }
 
-fn demo_init(p_ctx *C.JSContext, p_m *C.JSModuleDef) {
+fn demo_init(p_ctx *C.JSContext, p_m *C.JSModuleDef) int {
     ctx := quickjs.make_context(p_ctx)
     m := quickjs.make_module(p_ctx, p_m)
     m.new_cfunction('fib', 1, &js_fib)
@@ -76,6 +76,9 @@ fn demo_init(p_ctx *C.JSContext, p_m *C.JSModuleDef) {
     m.new_class(demo_class_id, class_def, proto)
 
     m.new_constructor('Counter', 1, &counter_constructor)
+
+    // return is important
+    return 0
 }
 
 fn init_module_demo(ctx quickjs.Context) {
