@@ -13,3 +13,5 @@ test_win:
 
 clean:
 	rm -f qjs qjs.exe .qjs.c fns.txt
+
+.PHONY: qjs test test_win clean
