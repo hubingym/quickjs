@@ -26,12 +26,10 @@ fn main() {
     fp.skip_executable()
     files := fp.finalize() or {
         panic(err)
-        return
     }
     // println(files)
     if files.len < 1 {
         panic('no input javascript file')
-        return
     }
 
     // runtime

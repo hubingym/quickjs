@@ -1,5 +1,6 @@
 module quickjs
 
+#include <fcntl.h>
 #flag -I @VMOD/quickjs/src
 #include "quickjs-libc.h"
 #flag @VMOD/quickjs/quickjs.o
