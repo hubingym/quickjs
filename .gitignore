@@ -4,6 +4,7 @@ a.out
 qjs/qjs
 *.exe
 .*.c
+*.tmp.c
 *.o
 *.dSYM/
 fns.txt

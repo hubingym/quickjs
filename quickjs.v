@@ -5,29 +5,6 @@ module quickjs
 #include "quickjs-libc.h"
 #flag @VMOD/quickjs/quickjs.o
 
-import const (
-    JS_TAG_BOOL
-    JS_TAG_NULL
-    JS_TAG_UNDEFINED
-    JS_TAG_EXCEPTION
-
-    JS_PROP_CONFIGURABLE
-    JS_PROP_WRITABLE
-    JS_PROP_ENUMERABLE
-    JS_PROP_C_W_E
-
-    JS_CFUNC_generic
-    JS_CFUNC_generic_magic
-    JS_CFUNC_constructor
-    JS_CFUNC_constructor_magic
-    JS_CFUNC_constructor_or_func
-    JS_CFUNC_constructor_or_func_magic
-    JS_CFUNC_getter
-    JS_CFUNC_setter
-    JS_CFUNC_getter_magic
-    JS_CFUNC_setter_magic
-)
-
 struct C.JSRuntime {
 }
 
@@ -317,7 +294,7 @@ pub fn (m Module) new_cfunction(name string, length int, func voidptr) {
 }
 
 pub fn (m Module) new_constructor(name string, length int, func voidptr) {
-    val := C.JS_NewCFunction2(m.p_ctx, func, name.str, length, JS_CFUNC_constructor, 0)
+    val := C.JS_NewCFunction2(m.p_ctx, func, name.str, length, C.JS_CFUNC_constructor, 0)
     m.set_export_item(name, val)
 }
 

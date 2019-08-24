@@ -15,7 +15,7 @@ fn fib(n int) int {
 fn js_fib(p_ctx *C.JSContext, this_val C.JSValue, argc int, argv *C.JSValue) C.JSValue {
     n := 0
     if C.JS_ToInt32(p_ctx, &n, argv[0]) != 0 {
-        return C.JS_MKVAL(JS_TAG_EXCEPTION, 0)
+        return C.JS_MKVAL(C.JS_TAG_EXCEPTION, 0)
     }
     res := fib(n)
     return C.JS_NewInt32(p_ctx, res)
@@ -34,7 +34,7 @@ fn counter_constructor(p_ctx *C.JSContext, new_target C.JSValue, argc int, argv 
     ctx := quickjs.make_context(p_ctx)
     n := 0
     if C.JS_ToInt32(p_ctx, &n, argv[0]) != 0 {
-        return C.JS_MKVAL(JS_TAG_EXCEPTION, 0)
+        return C.JS_MKVAL(C.JS_TAG_EXCEPTION, 0)
     }
     obj := ctx.new_object_class(demo_class_id)
     ctx.set_property_int32(obj, 'value', n)
@@ -47,11 +47,11 @@ fn counter_update(p_ctx *C.JSContext, this_val C.JSValue, argc int, argv *C.JSVa
     ctx := quickjs.make_context(p_ctx)
     n := 0
     if C.JS_ToInt32(p_ctx, &n, argv[0]) != 0 {
-        return C.JS_MKVAL(JS_TAG_EXCEPTION, 0)
+        return C.JS_MKVAL(C.JS_TAG_EXCEPTION, 0)
     }
     value := ctx.get_property_int32(this_val, 'value')
     ctx.set_property_int32(this_val, 'value', n + value)
-    return C.JS_MKVAL(JS_TAG_UNDEFINED, 0)
+    return C.JS_MKVAL(C.JS_TAG_UNDEFINED, 0)
 }
 
 fn demo_init(p_ctx *C.JSContext, p_m *C.JSModuleDef) int {
