@@ -12,7 +12,7 @@ fn fib(n int) int {
     }
 }
 
-fn js_fib(p_ctx *C.JSContext, this_val C.JSValue, argc int, argv *C.JSValue) C.JSValue {
+fn js_fib(p_ctx &C.JSContext, this_val C.JSValue, argc int, argv &C.JSValue) C.JSValue {
     n := 0
     if C.JS_ToInt32(p_ctx, &n, argv[0]) != 0 {
         return C.JS_MKVAL(C.JS_TAG_EXCEPTION, 0)
@@ -25,12 +25,12 @@ const (
     demo_class_id = quickjs.new_class_id()
 )
 
-fn counter_finalizer(p_rt *C.JSRuntime, val C.JSValue) {
+fn counter_finalizer(p_rt &C.JSRuntime, val C.JSValue) {
     // free something
     // C.JS_GetOpaque
 }
 
-fn counter_constructor(p_ctx *C.JSContext, new_target C.JSValue, argc int, argv *C.JSValue) C.JSValue {
+fn counter_constructor(p_ctx &C.JSContext, new_target C.JSValue, argc int, argv &C.JSValue) C.JSValue {
     ctx := quickjs.make_context(p_ctx)
     n := 0
     if C.JS_ToInt32(p_ctx, &n, argv[0]) != 0 {
@@ -43,7 +43,7 @@ fn counter_constructor(p_ctx *C.JSContext, new_target C.JSValue, argc int, argv 
     return obj
 }
 
-fn counter_update(p_ctx *C.JSContext, this_val C.JSValue, argc int, argv *C.JSValue) C.JSValue {
+fn counter_update(p_ctx &C.JSContext, this_val C.JSValue, argc int, argv &C.JSValue) C.JSValue {
     ctx := quickjs.make_context(p_ctx)
     n := 0
     if C.JS_ToInt32(p_ctx, &n, argv[0]) != 0 {
@@ -54,7 +54,7 @@ fn counter_update(p_ctx *C.JSContext, this_val C.JSValue, argc int, argv *C.JSVa
     return C.JS_MKVAL(C.JS_TAG_UNDEFINED, 0)
 }
 
-fn demo_init(p_ctx *C.JSContext, p_m *C.JSModuleDef) int {
+fn demo_init(p_ctx &C.JSContext, p_m &C.JSModuleDef) int {
     ctx := quickjs.make_context(p_ctx)
     m := quickjs.make_module(p_ctx, p_m)
     m.new_cfunction('fib', 1, &js_fib)
