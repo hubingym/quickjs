@@ -1,5 +1,5 @@
 qjs:
-	v -debug -show_c_cmd -o qjs src
+	v -show_c_cmd -o qjs src
 
 test:
 	./qjs js/hello.js

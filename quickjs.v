@@ -76,7 +76,7 @@ mut:
 
 pub fn new_runtime() Runtime {
     p_rt := C.JS_NewRuntime()
-    if !p_rt {
+    if isnil(p_rt) {
         panic('quickjs: cannot allocate JS runtime')
     }
     // loader for ES6 modules
@@ -109,7 +109,7 @@ mut:
 
 pub fn new_context(rt Runtime) Context {
     p_ctx := C.JS_NewContext(rt.p_rt)
-    if !p_ctx {
+    if isnil(p_ctx) {
         panic('quickjs: cannot allocate JS context')
     }
     ctx := Context {
@@ -246,7 +246,7 @@ struct Module {
 
 fn new_module(p_ctx &C.JSContext, name string, init_func voidptr) Module {
     p_m := C.JS_NewCModule(p_ctx, name.str, init_func)
-    if !p_m {
+    if isnil(p_m) {
         panic('quickjs: cannot allocate JS CModule')
     }
     m := Module {
