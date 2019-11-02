@@ -5,16 +5,16 @@ module quickjs
 #include "quickjs-libc.h"
 #flag @VMOD/quickjs/quickjs.o
 
-struct C.JSRuntime {
+pub struct C.JSRuntime {
 }
 
-struct C.JSContext {
+pub struct C.JSContext {
 }
 
-struct C.JSModuleDef {
+pub struct C.JSModuleDef {
 }
 
-struct C.JSClassDef {
+pub struct C.JSClassDef {
     class_name byteptr
     finalizer voidptr
     gc_mark voidptr
@@ -22,7 +22,7 @@ struct C.JSClassDef {
     exotic voidptr
 }
 
-struct C.JSValue {
+pub struct C.JSValue {
 }
 
 fn C.js_malloc(ctx &C.JSContext, size u32) voidptr
@@ -61,15 +61,12 @@ fn C.JS_ToFloat64(ctx &C.JSContext, pres &f64, val C.JSValue) int
 fn C.JS_ToCString(xtx &C.JSContext, val C.JSValue) byteptr
 fn C.JS_FreeCString(ctx &C.JSContext, ptr byteptr)
 
-fn todo_remove(){}
-
-
 pub fn new_class_id() u32 {
     class_id := u32(0)
     return C.JS_NewClassID(&class_id)
 }
 
-struct Runtime {
+pub struct Runtime {
 mut:
     p_rt &C.JSRuntime
 }
@@ -102,7 +99,7 @@ pub fn (rt Runtime) run_gc() {
     C.JS_RunGC(rt.p_rt)
 }
 
-struct Context {
+pub struct Context {
 mut:
     p_ctx &C.JSContext
 }
@@ -239,7 +236,7 @@ pub fn (ctx Context) add_module(name string, init_func voidptr) Module {
     return m
 }
 
-struct Module {
+pub struct Module {
     p_ctx &C.JSContext
     p_m &C.JSModuleDef
 }
